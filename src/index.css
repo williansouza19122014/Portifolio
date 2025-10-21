@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {};
+
+@layer base {
+  html, body { height: 100% }
+}
+
+body { @apply antialiased text-white bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900; }
