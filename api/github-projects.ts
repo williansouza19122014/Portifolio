@@ -99,6 +99,12 @@ const MOBILE_KEYWORDS = [
   'flutter'
 ]
 
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_TOKEN
+const GITHUB_USERNAME_ENV =
+  process.env.GITHUB_USERNAME ||
+  process.env.VITE_GITHUB_USERNAME ||
+  process.env.NEXT_PUBLIC_GITHUB_USERNAME
+
 const getProjectImage = (language: string, topics: string[]) => {
   const imageMap: Record<string, string> = {
     javascript: 'https://images.pexels.com/photos/11035380/pexels-photo-11035380.jpeg?auto=compress&cs=tinysrgb&w=600',
@@ -200,17 +206,13 @@ const getProjectCategories = (params: {
 }
 
 const createOctokit = () =>
-  new Octokit(
-    process.env.GITHUB_TOKEN
-      ? { auth: process.env.GITHUB_TOKEN }
-      : undefined
-  )
+  new Octokit(GITHUB_TOKEN ? { auth: GITHUB_TOKEN } : undefined)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const octokit = createOctokit()
   const username =
     (typeof req.query.username === 'string' && req.query.username.trim()) ||
-    process.env.GITHUB_USERNAME
+    GITHUB_USERNAME_ENV
   if (!username) {
     return res.status(400).json({ error: 'Missing GitHub username' })
   }
