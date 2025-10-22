@@ -1,10 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Octokit } from 'octokit'
 
-const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN
-})
-
 const TECHNOLOGY_ALIAS: Record<string, string> = {
   mongoose: 'MongoDB',
   express: 'Express',
@@ -131,13 +127,20 @@ const normaliseTechName = (name: string) => {
 const containsKeyword = (list: string[], haystack: string) =>
   list.some((keyword) => haystack.includes(keyword))
 
+const createOctokit = () =>
+  new Octokit(
+    process.env.GITHUB_TOKEN
+      ? { auth: process.env.GITHUB_TOKEN }
+      : undefined
+  )
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const username = (req.query.username as string) || process.env.GITHUB_USERNAME
+  const octokit = createOctokit()
+  const username =
+    (typeof req.query.username === 'string' && req.query.username.trim()) ||
+    process.env.GITHUB_USERNAME
   if (!username) {
     return res.status(400).json({ error: 'Missing GitHub username' })
-  }
-  if (!process.env.GITHUB_TOKEN) {
-    return res.status(500).json({ error: 'GitHub token not configured on the server' })
   }
 
   try {
