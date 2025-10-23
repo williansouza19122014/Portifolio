@@ -104,24 +104,47 @@ const containsKeyword = (list: string[], haystack: string) =>
 const createOctokit = () => new Octokit(GITHUB_TOKEN ? { auth: GITHUB_TOKEN } : undefined)
 
 // ===== Git helpers: varre a árvore e lê TODOS os package.json =====
-async function listPackageJsonPaths(octokit: Octokit, owner: string, repo: string, defaultBranch: string) {
-  const ref = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${defaultBranch}` })
-  const commitSha = ref.data.object.sha
+async function listPackageJsonPaths(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  defaultBranch: string
+) {
+  // 1) pega o commit da HEAD
+  const { data: ref } = await octokit.rest.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${defaultBranch}`
+  })
+  const commitSha = (ref.object as any).sha
 
-  const tree = await octokit.rest.git.getTree({
-    owner, repo, tree_sha: commitSha, recursive: '1'
+  // 2) resolve o commit para obter o SHA da ÁRVORE (tree)
+  const { data: commit } = await octokit.rest.git.getCommit({
+    owner,
+    repo,
+    commit_sha: commitSha
+  })
+  const treeSha = commit.tree.sha
+
+  // 3) agora sim: pega a árvore recursiva a partir do treeSha
+  const { data: tree } = await octokit.rest.git.getTree({
+    owner,
+    repo,
+    tree_sha: treeSha,
+    recursive: '1'
   })
 
-  const paths = (tree.data.tree || [])
-    .filter((n: any) =>
-      n.type === 'blob' &&
-      typeof n.path === 'string' &&
-      n.path.endsWith('package.json') &&
-      !n.path.includes('node_modules/')
+  const paths = (tree.tree || [])
+    .filter(
+      (n: any) =>
+        n.type === 'blob' &&
+        typeof n.path === 'string' &&
+        n.path.endsWith('package.json') &&
+        !n.path.includes('node_modules/')
     )
     .map((n: any) => n.path as string)
 
-  // limite defensivo p/ não estourar timeout da função
+  // limite defensivo
   return paths.slice(0, 25)
 }
 
