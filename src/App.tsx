@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
@@ -122,7 +123,9 @@ const navigationItems: NavigationItem[] = [
 
 const App: React.FC = () => {
   const {
+    // IMPORTANTE: agora também trazemos techSkills
     skillsData,
+    techSkills,
     isLoading: isLoadingGitHub,
     error: gitHubError,
     apiRestCount,
@@ -140,27 +143,29 @@ const App: React.FC = () => {
   const [activeFilter, setActiveFilter] = React.useState('todos')
   const [showAvatarContacts, setShowAvatarContacts] = React.useState(false)
 
-  const displaySkills =
-    gitHubError || skillsData.length === 0
-      ? fallbackSkills
-      : skillsData.map((skill) => ({
-          ...skill,
-          icon: getTechIcon(skill.name)
-        }))
-
+  // === PROJETOS (inalterado) ===
   const displayProjects = projectsError || githubProjects.length === 0 ? fallbackProjects : githubProjects
+  const filteredProjects =
+    activeFilter === 'todos'
+      ? displayProjects
+      : displayProjects.filter((project) => (project.categories ?? []).includes(activeFilter))
 
-  const topSkills = (gitHubError ? fallbackSkills : displaySkills).slice(0, 6)
+  // === HABILIDADES: prioriza techSkills -> skillsData -> fallback ===
+  const computedBaseSkills =
+    techSkills && techSkills.length > 0
+      ? techSkills.map((s) => ({ ...s, icon: getTechIcon(s.name) }))
+      : (skillsData && skillsData.length > 0
+          ? skillsData.map((s) => ({ ...s, icon: getTechIcon(s.name) }))
+          : fallbackSkills)
+
+  const topSkills = computedBaseSkills.slice(0, 6)
+
+  // Destaques (inalterado)
   const capabilityHighlights = [
     { label: 'API REST', value: apiRestCount },
     { label: 'CRUD', value: crudCount },
     { label: 'Full Stack', value: fullstackCount }
   ]
-
-  const filteredProjects =
-    activeFilter === 'todos'
-      ? displayProjects
-      : displayProjects.filter((project) => (project.categories ?? []).includes(activeFilter))
 
   React.useEffect(() => {
     if (currentPage === 'about') {
@@ -244,7 +249,6 @@ const App: React.FC = () => {
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold text-white">
                 &lt;Dev/&gt;
               </motion.div>
-
               <div className="hidden md:flex space-x-8">
                 {navigationItems.map((item) => (
                   <motion.button
@@ -254,7 +258,6 @@ const App: React.FC = () => {
                         item.action(setCurrentPage)
                         return
                       }
-
                       if (item.href) {
                         document.querySelector(item.href)?.scrollIntoView({ behavior: 'smooth' })
                       }
@@ -285,14 +288,12 @@ const App: React.FC = () => {
                     <Code className="w-12 h-12 text-purple-400" />
                   </div>
                 </div>
-
                 <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
                   Desenvolvedor
                   <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                     JavaScript
                   </span>
                 </h1>
-
                 <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
                   Transformo ideias em soluções digitais. Foco em desempenho, código limpo e ótima experiência para o usuário.
                 </p>
@@ -336,6 +337,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </section>
+
         <section id="projetos" className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <motion.div
@@ -388,7 +390,6 @@ const App: React.FC = () => {
                       className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-
                     <div className="absolute top-4 right-4 flex space-x-2">
                       {project.stars > 0 && (
                         <div className="bg-black/50 backdrop-blur-sm rounded-full px-2 py-1 flex items-center space-x-1">
@@ -450,7 +451,6 @@ const App: React.FC = () => {
                           </a>
                         )}
                       </div>
-
                       <span className="text-xs text-gray-500">
                         {(project.size / 1024).toFixed(1)}MB
                       </span>
@@ -484,7 +484,7 @@ const App: React.FC = () => {
                 Minhas <span className="text-purple-400">Habilidades</span>
               </h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
-                {gitHubError || skillsData.length === 0
+                {gitHubError || (techSkills.length === 0 && skillsData.length === 0)
                   ? 'Tecnologias e ferramentas que domino para criar soluções eficientes'
                   : 'Baseado na análise automática dos meus repositórios GitHub'}
               </p>
@@ -538,6 +538,7 @@ const App: React.FC = () => {
                     className="bg-white/5 border border-white/10 rounded-xl p-4"
                   >
                     <div className="flex items-center mb-4">
+                      {/* skill.icon vem de getTechIcon para techSkills/skillsData; no fallback já está no objeto */}
                       <skill.icon className="w-7 h-7 text-purple-400 mr-3" />
                       <div>
                         <h4 className="text-lg font-semibold text-white">{skill.name}</h4>
@@ -557,7 +558,7 @@ const App: React.FC = () => {
 
                     {'bytes' in skill && (
                       <div className="text-xs text-gray-400">
-                        {(skill.bytes / 1024).toFixed(1)}KB mapeados
+                        {(Number((skill as any).bytes) / 1024).toFixed(1)}KB mapeados
                       </div>
                     )}
                   </div>
@@ -578,7 +579,6 @@ const App: React.FC = () => {
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
                 Vamos <span className="text-purple-400">Conversar?</span>
               </h2>
-
               <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
                 <a
                   href="mailto:willianferreira.adm1@gmail.com"
@@ -587,7 +587,6 @@ const App: React.FC = () => {
                   <Mail className="w-5 h-5" />
                   <span>Enviar email</span>
                 </a>
-
                 <div className="flex space-x-4">
                   {contactLinks
                     .filter((contact) => contact.id !== 'mail')

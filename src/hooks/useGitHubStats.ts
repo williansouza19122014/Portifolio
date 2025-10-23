@@ -1,21 +1,27 @@
 import { useEffect, useState } from 'react'
 
 interface GitHubStats {
-  languages: { [key: string]: number }
+  languages: Record<string, number>
   totalRepos: number
   totalStars: number
   isLoading: boolean
   error: string | null
-  detectedTechs: { [key: string]: number }
+  detectedTechs: Record<string, number>
   apiRestCount: number
   fullstackCount: number
   crudCount: number
 }
 
-interface SkillData {
+export interface SkillData {
   name: string
   level: number
   bytes: number
+}
+
+export interface TechSkill {
+  name: string
+  level: number // porcentagem (0–100)
+  count: number // em quantos repositórios a tech apareceu
 }
 
 interface StatsResponse {
@@ -26,7 +32,8 @@ interface StatsResponse {
   apiRestCount?: number
   fullstackCount?: number
   crudCount?: number
-  skillsData?: SkillData[]
+  skillsData?: SkillData[]      // linguagens por bytes
+  techSkills?: TechSkill[]      // tecnologias dos package.json (NOVO)
   error?: string
 }
 
@@ -42,30 +49,32 @@ export const useGitHubStats = () => {
     detectedTechs: {},
     apiRestCount: 0,
     fullstackCount: 0,
-    crudCount: 0
+    crudCount: 0,
   })
 
-  const [skillsData, setSkillsData] = useState<SkillData[]>([])
+  const [skillsData, setSkillsData] = useState<SkillData[]>([])   // linguagens
+  const [techSkills, setTechSkills] = useState<TechSkill[]>([])   // tecnologias
 
   useEffect(() => {
     const controller = new AbortController()
 
     const fetchStats = async () => {
       if (!GITHUB_USERNAME) {
-        setStats((prev) => ({
+        setStats(prev => ({
           ...prev,
           isLoading: false,
-          error: 'Configure VITE_GITHUB_USERNAME para carregar os dados do GitHub.'
+          error: 'Configure VITE_GITHUB_USERNAME para carregar os dados do GitHub.',
         }))
         return
       }
 
-      setStats((prev) => ({ ...prev, isLoading: true, error: null }))
+      setStats(prev => ({ ...prev, isLoading: true, error: null }))
 
       try {
-        const response = await fetch(`/api/github-stats?username=${encodeURIComponent(GITHUB_USERNAME)}`, {
-          signal: controller.signal
-        })
+        const response = await fetch(
+          `/api/github-stats?username=${encodeURIComponent(GITHUB_USERNAME)}`,
+          { signal: controller.signal }
+        )
 
         if (!response.ok) {
           const message = await response.text()
@@ -73,10 +82,7 @@ export const useGitHubStats = () => {
         }
 
         const data: StatsResponse = await response.json()
-
-        if (data.error) {
-          throw new Error(data.error)
-        }
+        if (data.error) throw new Error(data.error)
 
         setStats({
           languages: data.languages ?? {},
@@ -87,29 +93,30 @@ export const useGitHubStats = () => {
           detectedTechs: data.detectedTechs ?? {},
           apiRestCount: data.apiRestCount ?? 0,
           fullstackCount: data.fullstackCount ?? 0,
-          crudCount: data.crudCount ?? 0
+          crudCount: data.crudCount ?? 0,
         })
 
         setSkillsData(data.skillsData ?? [])
-      } catch (error) {
+        setTechSkills(data.techSkills ?? [])
+      } catch (err) {
         if (controller.signal.aborted) return
-
-        console.error('Erro ao carregar estatísticas do GitHub:', error)
-        setStats((prev) => ({
+        console.error('Erro ao carregar estatísticas do GitHub:', err)
+        setStats(prev => ({
           ...prev,
           isLoading: false,
-          error: 'Erro ao carregar dados do GitHub. Verifique se o usuário existe ou tente novamente mais tarde.'
+          error:
+            'Erro ao carregar dados do GitHub. Verifique se o usuário existe ou tente novamente mais tarde.',
         }))
       }
     }
 
     fetchStats()
-
     return () => controller.abort()
   }, [])
 
   return {
     ...stats,
-    skillsData
+    skillsData,   // linguagens (fallback)
+    techSkills,   // tecnologias (use isto na UI "Minhas Habilidades")
   }
 }

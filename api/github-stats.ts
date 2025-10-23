@@ -205,6 +205,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const defaultBranch: string = repo.default_branch || 'main'
         const pkgPaths = await listPackageJsonPaths(octokit, username, repo.name, defaultBranch)
 
+        // opcional: Set para evitar contar mesma tech várias vezes no mesmo repo
+        const techsInRepo = new Set<string>()
+
         for (const p of pkgPaths) {
           const pkg = await readPackageJson(octokit, username, repo.name, p)
           if (!pkg) continue
@@ -219,8 +222,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           for (const depName of Object.keys(dependencies)) {
             const normalized = normaliseTechName(depName)
             if (!normalized) continue
-            techTally[normalized] = (techTally[normalized] || 0) + 1
+            techsInRepo.add(normalized) // conte 1x por repo
           }
+        }
+
+        for (const t of techsInRepo) {
+          techTally[t] = (techTally[t] || 0) + 1
         }
       } catch (error) {
         console.log(`Não foi possível varrer package.json no repo ${repo.name}`, error)
@@ -260,6 +267,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .sort((a, b) => b.bytes - a.bytes)
             .slice(0, 8)
 
+    // ===== NOVO: skills por tecnologia (a partir do techTally) =====
+    const techTotal = Object.values(techTally).reduce((sum, c) => sum + c, 0)
+    const techSkills =
+      techTotal === 0
+        ? []
+        : Object.entries(techTally)
+            .map(([name, count]) => ({
+              name,
+              count,
+              level: Math.max(1, Math.round((count / techTotal) * 100)) // % arredondado
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 12) // top 12
+
     // Cache leve (CDN/Edge)
     res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=86400')
 
@@ -271,7 +292,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       apiRestCount,
       fullstackCount,
       crudCount,
-      skillsData
+      skillsData,  // linguagens
+      techSkills   // tecnologias (para "Minhas Habilidades")
     })
   } catch (error) {
     console.error('Erro ao gerar estatísticas do GitHub', error)
