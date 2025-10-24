@@ -20,15 +20,18 @@ const TECHNOLOGY_ALIAS: Record<string, string> = {
   'react-router-dom': 'React Router',
   'framer-motion': 'Framer Motion',
   'lucide-react': 'Lucide',
+
   // Build/Tooling
   vite: 'Vite',
   '@vitejs/plugin-react': 'Vite',
   '@vitejs/plugin-react-swc': 'Vite',
+
   // CSS
   tailwindcss: 'Tailwind CSS',
   '@tailwindcss/postcss': 'Tailwind CSS',
   postcss: 'PostCSS',
   autoprefixer: 'Autoprefixer',
+
   // TS/Lint
   typescript: 'TypeScript',
   '@types/node': 'TypeScript',
@@ -37,9 +40,13 @@ const TECHNOLOGY_ALIAS: Record<string, string> = {
   eslint: 'ESLint',
   'eslint-plugin-react-hooks': 'ESLint',
   'eslint-plugin-react-refresh': 'ESLint',
+  // (ajuste pedido)
+  globals: 'ESLint',
+
   // Serverless/GitHub
   '@vercel/node': 'Vercel Functions',
   octokit: 'Octokit',
+
   // Backend/DB comuns
   express: 'Express',
   mongoose: 'MongoDB',
@@ -57,8 +64,13 @@ const IGNORE_PREFIXES = [
   'vitest',
   'jest',
   'tsup',
-  'rimraf'
+  'rimraf',
 ]
+
+// ignore por nome exato (opcional)
+const IGNORE_PACKAGES = new Set<string>([
+  // 'globals', // se preferir ignorar ao invés de agrupar em ESLint
+])
 
 // Heurísticas de categorias
 const BACKEND_LANGUAGE_HINTS = new Set([
@@ -80,18 +92,15 @@ const toTitleCase = (value: string) =>
 
 function normaliseTechName(name: string): string | null {
   const trimmed = name.toLowerCase().trim()
-
-  // ignora ruído/ferramentas
+  if (IGNORE_PACKAGES.has(trimmed)) return null
   if (IGNORE_PREFIXES.some(p => trimmed.startsWith(p))) return null
-
   if (TECHNOLOGY_ALIAS[trimmed]) return TECHNOLOGY_ALIAS[trimmed]
   if (trimmed.startsWith('@types/')) return 'TypeScript'
   if (trimmed.startsWith('typescript-eslint')) return 'TypeScript'
   if (trimmed.startsWith('eslint-') || trimmed.startsWith('@eslint/')) return 'ESLint'
   if (trimmed.startsWith('@tailwindcss')) return 'Tailwind CSS'
   if (trimmed.startsWith('@vitejs') || trimmed.startsWith('vite-plugin-')) return 'Vite'
-
-  // fallback: tira escopo e hifens
+  // fallback
   const sanitized = trimmed.replace(/^@.*\//, '').replace(/[-_]/g, ' ')
   const base = toTitleCase(sanitized)
   if (['Core','Plugin','Utils'].includes(base)) return null
@@ -103,14 +112,14 @@ const containsKeyword = (list: string[], haystack: string) =>
 
 const createOctokit = () => new Octokit(GITHUB_TOKEN ? { auth: GITHUB_TOKEN } : undefined)
 
-// ===== Git helpers: varre a árvore e lê TODOS os package.json =====
+// ===== Git helpers =====
+// (correção: precisa pegar o SHA da ÁRVORE e não do commit)
 async function listPackageJsonPaths(
   octokit: Octokit,
   owner: string,
   repo: string,
   defaultBranch: string
 ) {
-  // 1) pega o commit da HEAD
   const { data: ref } = await octokit.rest.git.getRef({
     owner,
     repo,
@@ -118,7 +127,6 @@ async function listPackageJsonPaths(
   })
   const commitSha = (ref.object as any).sha
 
-  // 2) resolve o commit para obter o SHA da ÁRVORE (tree)
   const { data: commit } = await octokit.rest.git.getCommit({
     owner,
     repo,
@@ -126,7 +134,6 @@ async function listPackageJsonPaths(
   })
   const treeSha = commit.tree.sha
 
-  // 3) agora sim: pega a árvore recursiva a partir do treeSha
   const { data: tree } = await octokit.rest.git.getTree({
     owner,
     repo,
@@ -144,21 +151,13 @@ async function listPackageJsonPaths(
     )
     .map((n: any) => n.path as string)
 
-  // limite defensivo
   return paths.slice(0, 25)
 }
 
 async function readPackageJson(octokit: Octokit, owner: string, repo: string, path: string) {
   const resp = await octokit.rest.repos.getContent({ owner, repo, path })
-
-  // Se vier array, é diretório/listagem — não nos interessa
   if (Array.isArray(resp.data)) return null
-
-  // Garante que é arquivo com 'content'
-  if (resp.data.type !== 'file' || !('content' in resp.data) || !resp.data.content) {
-    return null
-  }
-
+  if (resp.data.type !== 'file' || !('content' in resp.data) || !resp.data.content) return null
   const base64 = resp.data.content
   const text = Buffer.from(base64, 'base64').toString('utf-8')
   try { return JSON.parse(text) } catch { return null }
@@ -192,12 +191,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const repos = await listAllUserRepos(octokit, username)
-
     const publicRepos = repos.filter(
       (repo: any) =>
         (repo.visibility === 'public' || repo.private === false) &&
-        !repo.fork &&
-        !repo.archived
+        !repo.fork && !repo.archived
     )
 
     let totalStars = 0
@@ -214,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const { data: languages } = await octokit.rest.repos.listLanguages({
           owner: username,
-          repo: repo.name
+          repo: repo.name,
         })
         Object.entries(languages).forEach(([language, bytes]) => {
           languageStats[language] = (languageStats[language] || 0) + Number(bytes)
@@ -223,29 +220,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`Erro ao buscar linguagens do repo ${repo.name}`, error)
       }
 
-      // ===== Varre TODOS os package.json do repo =====
+      // Varre TODOS os package.json do repo (contando tech 1x por repo)
       try {
         const defaultBranch: string = repo.default_branch || 'main'
         const pkgPaths = await listPackageJsonPaths(octokit, username, repo.name, defaultBranch)
-
-        // opcional: Set para evitar contar mesma tech várias vezes no mesmo repo
         const techsInRepo = new Set<string>()
 
         for (const p of pkgPaths) {
           const pkg = await readPackageJson(octokit, username, repo.name, p)
           if (!pkg) continue
-
           const dependencies = {
             ...(pkg.dependencies || {}),
             ...(pkg.devDependencies || {}),
             ...(pkg.peerDependencies || {}),
-            ...(pkg.optionalDependencies || {})
+            ...(pkg.optionalDependencies || {}),
           }
-
           for (const depName of Object.keys(dependencies)) {
             const normalized = normaliseTechName(depName)
             if (!normalized) continue
-            techsInRepo.add(normalized) // conte 1x por repo
+            techsInRepo.add(normalized)
           }
         }
 
@@ -256,7 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`Não foi possível varrer package.json no repo ${repo.name}`, error)
       }
 
-      // ===== Heurísticas: API / CRUD / Fullstack =====
+      // Heurísticas: API / CRUD / Fullstack
       const combinedText = `${repo.name} ${repo.description ?? ''} ${Array.isArray(repo.topics) ? repo.topics.join(' ') : ''}`.toLowerCase()
       const topics: string[] = Array.isArray(repo.topics)
         ? repo.topics.map((t: string) => t.toLowerCase())
@@ -290,21 +283,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .sort((a, b) => b.bytes - a.bytes)
             .slice(0, 8)
 
-    // ===== NOVO: skills por tecnologia (a partir do techTally) =====
-    const techTotal = Object.values(techTally).reduce((sum, c) => sum + c, 0)
+    // ===== Tecnologias: % de repositórios que usam =====
+    const repoCount = publicRepos.length
     const techSkills =
-      techTotal === 0
+      repoCount === 0
         ? []
         : Object.entries(techTally)
             .map(([name, count]) => ({
               name,
               count,
-              level: Math.max(1, Math.round((count / techTotal) * 100)) // % arredondado
+              level: Math.max(1, Math.round((count / repoCount) * 100)) // % de repositórios
             }))
             .sort((a, b) => b.count - a.count)
-            .slice(0, 12) // top 12
+            .slice(0, 12)
 
-    // Cache leve (CDN/Edge)
+    // Cache leve
     res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=86400')
 
     return res.status(200).json({
@@ -315,8 +308,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       apiRestCount,
       fullstackCount,
       crudCount,
-      skillsData,  // linguagens
-      techSkills   // tecnologias (para "Minhas Habilidades")
+      skillsData,   // linguagens (bytes)
+      techSkills,   // tecnologias (% de repositórios)
+      repoCount     // para auditoria na UI (opcional)
     })
   } catch (error) {
     console.error('Erro ao gerar estatísticas do GitHub', error)

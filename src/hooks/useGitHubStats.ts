@@ -10,6 +10,7 @@ interface GitHubStats {
   apiRestCount: number
   fullstackCount: number
   crudCount: number
+  repoCount: number                  // NOVO
 }
 
 export interface SkillData {
@@ -20,7 +21,7 @@ export interface SkillData {
 
 export interface TechSkill {
   name: string
-  level: number // porcentagem (0–100)
+  level: number // porcentagem (0–100) - % de repositórios
   count: number // em quantos repositórios a tech apareceu
 }
 
@@ -32,8 +33,9 @@ interface StatsResponse {
   apiRestCount?: number
   fullstackCount?: number
   crudCount?: number
-  skillsData?: SkillData[]      // linguagens por bytes
-  techSkills?: TechSkill[]      // tecnologias dos package.json (NOVO)
+  repoCount?: number                 // NOVO
+  skillsData?: SkillData[]           // linguagens por bytes
+  techSkills?: TechSkill[]           // tecnologias por repo (NOVO)
   error?: string
 }
 
@@ -50,10 +52,11 @@ export const useGitHubStats = () => {
     apiRestCount: 0,
     fullstackCount: 0,
     crudCount: 0,
+    repoCount: 0,
   })
 
-  const [skillsData, setSkillsData] = useState<SkillData[]>([])   // linguagens
-  const [techSkills, setTechSkills] = useState<TechSkill[]>([])   // tecnologias
+  const [skillsData, setSkillsData] = useState<SkillData[]>([]) // linguagens
+  const [techSkills, setTechSkills] = useState<TechSkill[]>([]) // tecnologias
 
   useEffect(() => {
     const controller = new AbortController()
@@ -75,7 +78,6 @@ export const useGitHubStats = () => {
           `/api/github-stats?username=${encodeURIComponent(GITHUB_USERNAME)}`,
           { signal: controller.signal }
         )
-
         if (!response.ok) {
           const message = await response.text()
           throw new Error(message || 'Erro inesperado ao buscar estatísticas.')
@@ -94,6 +96,7 @@ export const useGitHubStats = () => {
           apiRestCount: data.apiRestCount ?? 0,
           fullstackCount: data.fullstackCount ?? 0,
           crudCount: data.crudCount ?? 0,
+          repoCount: data.repoCount ?? (data.totalRepos ?? 0),
         })
 
         setSkillsData(data.skillsData ?? [])
@@ -117,6 +120,6 @@ export const useGitHubStats = () => {
   return {
     ...stats,
     skillsData,   // linguagens (fallback)
-    techSkills,   // tecnologias (use isto na UI "Minhas Habilidades")
+    techSkills,   // tecnologias (% de repositórios)
   }
 }

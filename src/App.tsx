@@ -10,26 +10,23 @@ import {
   Database,
   Globe,
   Smartphone,
-  Star,
-  GitFork,
-  Calendar,
   User,
-  ExternalLink,
-  MessageCircle
+  MessageCircle,
 } from 'lucide-react'
 
 import avatarImg from './assets/img-avatar.jpg'
 import { useGitHubStats } from './hooks/useGitHubStats'
-import { useGitHubProjects } from './hooks/useGitHubProjects'
 import { getTechIcon, getTechColor } from './utils/techIcons'
 import About from './pages/About'
 
 type Page = 'home' | 'about'
 
+// tipagem da callback de navegação para evitar "implicit any"
+type SetPage = React.Dispatch<React.SetStateAction<Page>>
 type NavigationItem = {
   name: string
   href?: string
-  action?: (setPage: (page: Page) => void) => void
+  action?: (setPage: SetPage) => void
 }
 
 type ContactLink = {
@@ -41,130 +38,60 @@ type ContactLink = {
 }
 
 const contactLinks: ContactLink[] = [
-  {
-    id: 'github',
-    label: 'GitHub',
-    href: 'https://github.com/williansouza19122014',
-    icon: Github,
-    external: true
-  },
-  {
-    id: 'linkedin',
-    label: 'LinkedIn',
-    href: 'https://www.linkedin.com/in/willian-ferreira-souza-b7458769/',
-    icon: Linkedin,
-    external: true
-  },
-  {
-    id: 'mail',
-    label: 'Email',
-    href: 'mailto:willianferreira.adm1@gmail.com',
-    icon: Mail,
-    external: false
-  },
-  {
-    id: 'whatsapp',
-    label: 'WhatsApp',
-    href: 'https://wa.me/5516997322808',
-    icon: MessageCircle,
-    external: true
-  }
+  { id: 'github', label: 'GitHub', href: 'https://github.com/williansouza19122014', icon: Github, external: true },
+  { id: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/in/willian-ferreira-souza-b7458769/', icon: Linkedin, external: true },
+  { id: 'mail', label: 'Email', href: 'mailto:willianferreira.adm1@gmail.com', icon: Mail },
+  { id: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/5516997322808', icon: MessageCircle, external: true },
 ]
 
+// fallback para quando não houver dados do GitHub
 const fallbackSkills = [
   { name: 'JavaScript', level: 90, icon: Code },
   { name: 'React', level: 85, icon: Globe },
   { name: 'Node.js', level: 80, icon: Database },
   { name: 'TypeScript', level: 75, icon: Code },
   { name: 'Python', level: 70, icon: Code },
-  { name: 'React Native', level: 65, icon: Smartphone }
-]
-
-const fallbackProjects = [
-  {
-    id: 1,
-    title: 'Sistema de Gerenciamento',
-    description: 'Sistema completo para gerenciamento de clientes e vendas com dashboard interativo.',
-    technologies: ['React', 'Node.js', 'PostgreSQL', 'TypeScript'],
-    image: 'https://images.pexels.com/photos/574071/pexels-photo-574071.jpeg?auto=compress&cs=tinysrgb&w=600',
-    github: '#',
-    demo: null,
-    categories: ['frontend', 'backend', 'fullstack'],
-    stars: 0,
-    forks: 0,
-    language: 'TypeScript',
-    lastUpdate: '2024-01-15',
-    size: 1024
-  },
-  {
-    id: 2,
-    title: 'E-commerce Responsivo',
-    description: 'Loja virtual moderna com carrinho de compras e painel administrativo.',
-    technologies: ['React', 'Stripe', 'Firebase', 'Tailwind CSS'],
-    image: 'https://images.pexels.com/photos/230544/pexels-photo-230544.jpeg?auto=compress&cs=tinysrgb&w=600',
-    github: '#',
-    demo: null,
-    categories: ['frontend'],
-    stars: 0,
-    forks: 0,
-    language: 'JavaScript',
-    lastUpdate: '2024-01-10',
-    size: 2048
-  }
-]
-
-const navigationItems: NavigationItem[] = [
-  { name: 'Inicio', href: '#inicio' },
-  { name: 'Projetos', href: '#projetos' },
-  { name: 'Habilidades', href: '#habilidades' },
-  { name: 'Sobre', action: (setPage) => setPage('about') },
-  { name: 'Contato', href: '#contato' }
+  { name: 'React Native', level: 65, icon: Smartphone },
 ]
 
 const App: React.FC = () => {
   const {
-    // IMPORTANTE: agora também trazemos techSkills
     skillsData,
     techSkills,
     isLoading: isLoadingGitHub,
     error: gitHubError,
     apiRestCount,
     fullstackCount,
-    crudCount
+    crudCount,
+    repoCount,
   } = useGitHubStats()
 
-  const {
-    projects: githubProjects,
-    isLoading: isLoadingProjects,
-    error: projectsError
-  } = useGitHubProjects()
-
   const [currentPage, setCurrentPage] = React.useState<Page>('home')
-  const [activeFilter, setActiveFilter] = React.useState('todos')
   const [showAvatarContacts, setShowAvatarContacts] = React.useState(false)
-
-  // === PROJETOS (inalterado) ===
-  const displayProjects = projectsError || githubProjects.length === 0 ? fallbackProjects : githubProjects
-  const filteredProjects =
-    activeFilter === 'todos'
-      ? displayProjects
-      : displayProjects.filter((project) => (project.categories ?? []).includes(activeFilter))
 
   // === HABILIDADES: prioriza techSkills -> skillsData -> fallback ===
   const computedBaseSkills =
     techSkills && techSkills.length > 0
       ? techSkills.map((s) => ({ ...s, icon: getTechIcon(s.name) }))
-      : (skillsData && skillsData.length > 0
-          ? skillsData.map((s) => ({ ...s, icon: getTechIcon(s.name) }))
-          : fallbackSkills)
+      : skillsData && skillsData.length > 0
+      ? skillsData.map((s) => ({ ...s, icon: getTechIcon(s.name) }))
+      : fallbackSkills
 
   const topSkills = computedBaseSkills.slice(0, 6)
 
-  // Destaques (inalterado)
+  // Destaques
   const capabilityHighlights = [
     { label: 'API REST', value: apiRestCount },
     { label: 'CRUD', value: crudCount },
-    { label: 'Full Stack', value: fullstackCount }
+    { label: 'Full Stack', value: fullstackCount },
+  ]
+
+  // menu – sem item de “Projetos”
+  const navigationItems: NavigationItem[] = [
+    { name: 'Inicio', href: '#inicio' },
+    { name: 'Habilidades', href: '#habilidades' },
+    { name: 'Sobre', action: (setPage) => setPage('about') },
+    { name: 'Contato', href: '#contato' },
   ]
 
   React.useEffect(() => {
@@ -186,6 +113,7 @@ const App: React.FC = () => {
         exit={{ opacity: 0 }}
         className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900"
       >
+        {/* Avatar lateral */}
         <motion.aside
           initial={{ opacity: 0, x: -30, y: -30 }}
           animate={{ opacity: 1, x: 0, y: 0 }}
@@ -216,6 +144,7 @@ const App: React.FC = () => {
                 <div className="text-xs text-gray-300">Desenvolvedor</div>
               </div>
             </motion.div>
+
             <AnimatePresence>
               {showAvatarContacts && (
                 <motion.div
@@ -243,12 +172,14 @@ const App: React.FC = () => {
           </motion.div>
         </motion.aside>
 
+        {/* Navbar */}
         <nav className="fixed top-0 w-full bg-black/30 backdrop-blur-md z-50 border-b border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-3">
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold text-white">
                 &lt;Dev/&gt;
               </motion.div>
+
               <div className="hidden md:flex space-x-8">
                 {navigationItems.map((item) => (
                   <motion.button
@@ -274,6 +205,7 @@ const App: React.FC = () => {
           </div>
         </nav>
 
+        {/* Hero */}
         <section id="inicio" className="pt-28 pb-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center">
@@ -306,10 +238,10 @@ const App: React.FC = () => {
                 className="flex flex-col sm:flex-row gap-4 justify-center items-center"
               >
                 <button
-                  onClick={() => document.querySelector('#projetos')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => document.querySelector('#habilidades')?.scrollIntoView({ behavior: 'smooth' })}
                   className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-4 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105"
                 >
-                  Ver projetos
+                  Ver habilidades
                 </button>
 
                 <button
@@ -338,139 +270,7 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        <section id="projetos" className="py-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-              className="text-center mb-16"
-            >
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                Projetos <span className="text-purple-400">Reais</span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
-                {projectsError
-                  ? 'Não foi possível carregar os projetos do GitHub. Confira os destaques abaixo.'
-                  : `${filteredProjects.length} projetos carregados diretamente do GitHub.`}
-              </p>
-            </motion.div>
-
-            <div className="flex flex-wrap justify-center gap-4 mb-12">
-              {['todos', 'frontend', 'backend', 'fullstack', 'mobile'].map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setActiveFilter(filter)}
-                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
-                    activeFilter === filter
-                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
-                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                  }`}
-                >
-                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredProjects.map((project, index) => (
-                <motion.div
-                  key={project.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1, duration: 0.8 }}
-                  viewport={{ once: true }}
-                  className="bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all duration-300 group"
-                >
-                  <div className="relative overflow-hidden">
-                    <img
-                      src={project.image}
-                      alt={project.title}
-                      className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute top-4 right-4 flex space-x-2">
-                      {project.stars > 0 && (
-                        <div className="bg-black/50 backdrop-blur-sm rounded-full px-2 py-1 flex items-center space-x-1">
-                          <Star className="w-3 h-3 text-yellow-400" />
-                          <span className="text-white text-xs">{project.stars}</span>
-                        </div>
-                      )}
-                      {project.forks > 0 && (
-                        <div className="bg-black/50 backdrop-blur-sm rounded-full px-2 py-1 flex items-center space-x-1">
-                          <GitFork className="w-3 h-3 text-blue-400" />
-                          <span className="text-white text-xs">{project.forks}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-xl font-bold text-white">{project.title}</h3>
-                      <span className="text-xs text-gray-400 flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {project.lastUpdate}
-                      </span>
-                    </div>
-
-                    <p className="text-gray-300 mb-4 line-clamp-2">{project.description}</p>
-
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {project.technologies.map((tech) => (
-                        <span
-                          key={tech}
-                          className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm"
-                        >
-                          {tech}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <div className="flex space-x-4">
-                        <a
-                          href={project.github}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors duration-300"
-                        >
-                          <Github className="w-5 h-5" />
-                          <span>Codigo</span>
-                        </a>
-                        {project.demo && (
-                          <a
-                            href={project.demo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors duration-300"
-                          >
-                            <ExternalLink className="w-5 h-5" />
-                            <span>Demo</span>
-                          </a>
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {(project.size / 1024).toFixed(1)}MB
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {filteredProjects.length === 0 && !isLoadingProjects && (
-              <div className="text-center py-12">
-                <Code className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg">
-                  Nenhum projeto encontrado para esta categoria.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
+        {/* Habilidades */}
         <section id="habilidades" className="py-20 px-4 sm:px-6 lg:px-8 bg-black/20">
           <div className="max-w-7xl mx-auto">
             <motion.div
@@ -486,21 +286,15 @@ const App: React.FC = () => {
               <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
                 {gitHubError || (techSkills.length === 0 && skillsData.length === 0)
                   ? 'Tecnologias e ferramentas que domino para criar soluções eficientes'
-                  : 'Baseado na análise automática dos meus repositórios GitHub'}
+                  : techSkills.length > 0
+                  ? 'Baseado na presença das tecnologias nos meus repositórios GitHub'
+                  : 'Baseado na distribuição de bytes por linguagem nos repositórios'}
               </p>
 
               {isLoadingGitHub && (
                 <div className="flex items-center justify-center mb-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mr-3" />
                   <span className="text-gray-300">Analisando repositórios do GitHub...</span>
-                </div>
-              )}
-
-              {gitHubError && (
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-8 max-w-2xl mx-auto">
-                  <p className="text-yellow-300 text-sm">
-                    Usando dados estáticos. Configure seu usuário GitHub para ativar a análise automática.
-                  </p>
                 </div>
               )}
             </motion.div>
@@ -517,13 +311,9 @@ const App: React.FC = () => {
                   <h3 className="text-2xl font-semibold text-white">Stack principal</h3>
                   <p className="text-sm text-gray-300">Principais tecnologias identificadas nos repositórios</p>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
                   {capabilityHighlights.map(({ label, value }) => (
-                    <div
-                      key={label}
-                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center"
-                    >
+                    <div key={label} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center">
                       <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
                       <p className="text-xl font-semibold text-white">{value}</p>
                     </div>
@@ -532,17 +322,22 @@ const App: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {topSkills.map((skill, index) => (
-                  <div
-                    key={skill.name}
-                    className="bg-white/5 border border-white/10 rounded-xl p-4"
-                  >
+                {topSkills.map((skill: any, index) => (
+                  <div key={skill.name} className="bg-white/5 border border-white/10 rounded-xl p-4">
                     <div className="flex items-center mb-4">
-                      {/* skill.icon vem de getTechIcon para techSkills/skillsData; no fallback já está no objeto */}
                       <skill.icon className="w-7 h-7 text-purple-400 mr-3" />
                       <div>
                         <h4 className="text-lg font-semibold text-white">{skill.name}</h4>
-                        <p className="text-xs text-gray-400">{skill.level}% do codigo analisado</p>
+                        <p className="text-xs text-gray-400">
+                          {'bytes' in skill
+                            ? `${(Number(skill.bytes) / 1024).toFixed(1)}KB mapeados`
+                            : `${skill.level}% dos repositórios usam`}
+                        </p>
+                        {'count' in skill && repoCount > 0 && (
+                          <p className="text-[11px] text-gray-500">
+                            {skill.count} de {repoCount} repositórios
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -555,12 +350,6 @@ const App: React.FC = () => {
                         className={`bg-gradient-to-r ${getTechColor(skill.name)} h-full rounded-full`}
                       />
                     </div>
-
-                    {'bytes' in skill && (
-                      <div className="text-xs text-gray-400">
-                        {(Number((skill as any).bytes) / 1024).toFixed(1)}KB mapeados
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -568,6 +357,7 @@ const App: React.FC = () => {
           </div>
         </section>
 
+        {/* Contato */}
         <section id="contato" className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
             <motion.div
@@ -596,7 +386,7 @@ const App: React.FC = () => {
                         href={contact.href}
                         target={contact.external ? '_blank' : undefined}
                         rel={contact.external ? 'noreferrer' : undefined}
-                        className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-colors	duration-300"
+                        className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-colors duration-300"
                       >
                         <contact.icon className="w-6 h-6 text-white" />
                       </a>
