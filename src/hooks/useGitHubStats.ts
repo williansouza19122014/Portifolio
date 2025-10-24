@@ -21,31 +21,23 @@ export interface LanguagePresence {
 interface StatsResponse {
   totalRepos: number
   totalStars: number
-
   languageSkills: LanguageSkill[]
   languagePresence: LanguagePresence[]
-
   techSkills: TechSkill[]
-
   apiRestCount: number
   crudCount: number
   fullstackCount: number
-
   error?: string
 }
 
 export interface GitHubStatsState {
   isLoading: boolean
   error: string | null
-
   totalRepos: number
   totalStars: number
-
   languageSkills: LanguageSkill[]
   languagePresence: LanguagePresence[]
-
   techSkills: TechSkill[]
-
   apiRestCount: number
   crudCount: number
   fullstackCount: number
@@ -57,15 +49,11 @@ export const useGitHubStats = (): GitHubStatsState => {
   const [state, setState] = useState<GitHubStatsState>({
     isLoading: true,
     error: null,
-
     totalRepos: 0,
     totalStars: 0,
-
     languageSkills: [],
     languagePresence: [],
-
     techSkills: [],
-
     apiRestCount: 0,
     crudCount: 0,
     fullstackCount: 0,
@@ -86,24 +74,25 @@ export const useGitHubStats = (): GitHubStatsState => {
         const resp = await fetch(`/api/github-stats?username=${encodeURIComponent(GITHUB_USERNAME)}`, {
           signal: controller.signal
         })
+        
         if (!resp.ok) {
           throw new Error(await resp.text())
         }
+        
         const data: StatsResponse = await resp.json()
-        if (data.error) throw new Error(data.error)
+        
+        if (data.error) {
+          throw new Error(data.error)
+        }
 
         setState({
           isLoading: false,
           error: null,
-
           totalRepos: data.totalRepos,
           totalStars: data.totalStars,
-
           languageSkills: data.languageSkills || [],
           languagePresence: data.languagePresence || [],
-
           techSkills: data.techSkills || [],
-
           apiRestCount: data.apiRestCount || 0,
           crudCount: data.crudCount || 0,
           fullstackCount: data.fullstackCount || 0,

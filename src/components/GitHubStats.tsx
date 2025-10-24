@@ -1,10 +1,10 @@
-﻿import React from "react"
-import { motion } from "framer-motion"
-import { Github, Star, GitBranch, Activity, ServerCog, Database } from "lucide-react"
-import { useGitHubStats } from "../hooks/useGitHubStats"
+﻿import React from 'react'
+import { motion } from 'framer-motion'
+import { Github, Star, GitBranch, Activity, ServerCog, Database } from 'lucide-react'
+import { useGitHubStats } from '../hooks/useGitHubStats'
 
 const GitHubStats: React.FC = () => {
-  const { totalRepos, totalStars, isLoading, error, detectedTechs, apiRestCount, fullstackCount, crudCount } = useGitHubStats()
+  const { totalRepos, totalStars, isLoading, error, techSkills, apiRestCount, fullstackCount, crudCount } = useGitHubStats()
 
   if (isLoading) {
     return (
@@ -28,22 +28,16 @@ const GitHubStats: React.FC = () => {
   }
 
   const coreStats = [
-    { icon: GitBranch, label: "Repositórios", value: totalRepos },
-    { icon: Star, label: "Stars", value: totalStars },
-    { icon: Activity, label: "Ativo", value: "Sim" }
+    { icon: GitBranch, label: 'Repositórios', value: totalRepos },
+    { icon: Star, label: 'Stars', value: totalStars },
+    { icon: Activity, label: 'Ativo', value: 'Sim' }
   ]
-
-  const sortedTechs = detectedTechs
-    ? Object.entries(detectedTechs)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 20)
-    : []
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
+      transition={{ duration: 0.5 }}
       viewport={{ once: true }}
       className="bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/10"
     >
@@ -92,19 +86,19 @@ const GitHubStats: React.FC = () => {
           <div className="bg-white/10 h-2 rounded-full overflow-hidden">
             <div
               className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full"
-              style={{ width: `${Math.min(100, fullstackCount * 20)}%` }}
+              style={{ width: `${Math.min(100, (fullstackCount / totalRepos) * 100)}%` }}
             />
           </div>
         </div>
       </div>
 
-      {sortedTechs.length > 0 && (
+      {techSkills.length > 0 && (
         <div className="mt-6">
           <h4 className="text-sm font-medium text-gray-300 mb-2">Tecnologias detectadas (package.json)</h4>
           <div className="flex flex-wrap gap-2">
-            {sortedTechs.map(([tech, count]) => (
-              <span key={tech} className="px-3 py-1 rounded-full bg-white/10 text-gray-200 text-xs border border-white/10">
-                {tech} <span className="text-gray-400">×{count}</span>
+            {techSkills.map((tech) => (
+              <span key={tech.name} className="px-3 py-1 rounded-full bg-white/10 text-gray-200 text-xs border border-white/10">
+                {tech.name} <span className="text-gray-400">×{tech.count}</span>
               </span>
             ))}
           </div>
