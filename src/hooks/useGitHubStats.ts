@@ -34,7 +34,7 @@ interface StatsResponse {
   error?: string
 }
 
-interface GitHubStatsState {
+export interface GitHubStatsState {
   isLoading: boolean
   error: string | null
 
@@ -53,7 +53,7 @@ interface GitHubStatsState {
 
 const GITHUB_USERNAME = import.meta.env.VITE_GITHUB_USERNAME as string
 
-export const useGitHubStats = () => {
+export const useGitHubStats = (): GitHubStatsState => {
   const [state, setState] = useState<GitHubStatsState>({
     isLoading: true,
     error: null,
@@ -99,14 +99,14 @@ export const useGitHubStats = () => {
           totalRepos: data.totalRepos,
           totalStars: data.totalStars,
 
-          languageSkills: data.languageSkills ?? [],
-          languagePresence: data.languagePresence ?? [],
+          languageSkills: data.languageSkills || [],
+          languagePresence: data.languagePresence || [],
 
-          techSkills: data.techSkills ?? [],
+          techSkills: data.techSkills || [],
 
-          apiRestCount: data.apiRestCount ?? 0,
-          crudCount: data.crudCount ?? 0,
-          fullstackCount: data.fullstackCount ?? 0,
+          apiRestCount: data.apiRestCount || 0,
+          crudCount: data.crudCount || 0,
+          fullstackCount: data.fullstackCount || 0,
         })
       } catch (e) {
         if (controller.signal.aborted) return
@@ -114,7 +114,7 @@ export const useGitHubStats = () => {
         setState(s => ({
           ...s,
           isLoading: false,
-          error: 'Erro ao carregar dados do GitHub.',
+          error: e instanceof Error ? e.message : 'Erro ao carregar dados do GitHub.',
         }))
       }
     }
