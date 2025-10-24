@@ -1,116 +1,125 @@
 import { useEffect, useState } from 'react'
 
-export interface TechSkill {
-  name: string
-  level: number   // % de repositórios onde aparece
-  count: number   // número de repositórios
+interface GitHubStats {
+  languages: Record<string, number>
+  totalRepos: number
+  totalStars: number
+  isLoading: boolean
+  error: string | null
+  detectedTechs: Record<string, number>
+  apiRestCount: number
+  fullstackCount: number
+  crudCount: number
+  repoCount: number                  // NOVO
 }
 
-export interface LanguageSkill {
+export interface SkillData {
   name: string
-  level: number   // % por BYTES
+  level: number
   bytes: number
 }
 
-export interface LanguagePresence {
+export interface TechSkill {
   name: string
-  repos: number
-  percent: number // % de repositórios
+  level: number // porcentagem (0–100) - % de repositórios
+  count: number // em quantos repositórios a tech apareceu
 }
 
 interface StatsResponse {
-  totalRepos: number
-  totalStars: number
-  languageSkills: LanguageSkill[]
-  languagePresence: LanguagePresence[]
-  techSkills: TechSkill[]
-  apiRestCount: number
-  crudCount: number
-  fullstackCount: number
+  languages?: Record<string, number>
+  totalRepos?: number
+  totalStars?: number
+  detectedTechs?: Record<string, number>
+  apiRestCount?: number
+  fullstackCount?: number
+  crudCount?: number
+  repoCount?: number                 // NOVO
+  skillsData?: SkillData[]           // linguagens por bytes
+  techSkills?: TechSkill[]           // tecnologias por repo (NOVO)
   error?: string
-}
-
-export interface GitHubStatsState {
-  isLoading: boolean
-  error: string | null
-  totalRepos: number
-  totalStars: number
-  languageSkills: LanguageSkill[]
-  languagePresence: LanguagePresence[]
-  techSkills: TechSkill[]
-  apiRestCount: number
-  crudCount: number
-  fullstackCount: number
 }
 
 const GITHUB_USERNAME = import.meta.env.VITE_GITHUB_USERNAME as string
 
-export const useGitHubStats = (): GitHubStatsState => {
-  const [state, setState] = useState<GitHubStatsState>({
-    isLoading: true,
-    error: null,
+export const useGitHubStats = () => {
+  const [stats, setStats] = useState<GitHubStats>({
+    languages: {},
     totalRepos: 0,
     totalStars: 0,
-    languageSkills: [],
-    languagePresence: [],
-    techSkills: [],
+    isLoading: true,
+    error: null,
+    detectedTechs: {},
     apiRestCount: 0,
-    crudCount: 0,
     fullstackCount: 0,
+    crudCount: 0,
+    repoCount: 0,
   })
+
+  const [skillsData, setSkillsData] = useState<SkillData[]>([]) // linguagens
+  const [techSkills, setTechSkills] = useState<TechSkill[]>([]) // tecnologias
 
   useEffect(() => {
     const controller = new AbortController()
 
-    const run = async () => {
+    const fetchStats = async () => {
       if (!GITHUB_USERNAME) {
-        setState(s => ({ ...s, isLoading: false, error: 'Configure VITE_GITHUB_USERNAME' }))
+        setStats(prev => ({
+          ...prev,
+          isLoading: false,
+          error: 'Configure VITE_GITHUB_USERNAME para carregar os dados do GitHub.',
+        }))
         return
       }
 
+      setStats(prev => ({ ...prev, isLoading: true, error: null }))
+
       try {
-        setState(s => ({ ...s, isLoading: true, error: null }))
-
-        const resp = await fetch(`/api/github-stats?username=${encodeURIComponent(GITHUB_USERNAME)}`, {
-          signal: controller.signal
-        })
-        
-        if (!resp.ok) {
-          throw new Error(await resp.text())
-        }
-        
-        const data: StatsResponse = await resp.json()
-        
-        if (data.error) {
-          throw new Error(data.error)
+        const response = await fetch(
+          `/api/github-stats?username=${encodeURIComponent(GITHUB_USERNAME)}`,
+          { signal: controller.signal }
+        )
+        if (!response.ok) {
+          const message = await response.text()
+          throw new Error(message || 'Erro inesperado ao buscar estatísticas.')
         }
 
-        setState({
+        const data: StatsResponse = await response.json()
+        if (data.error) throw new Error(data.error)
+
+        setStats({
+          languages: data.languages ?? {},
+          totalRepos: data.totalRepos ?? 0,
+          totalStars: data.totalStars ?? 0,
           isLoading: false,
           error: null,
-          totalRepos: data.totalRepos,
-          totalStars: data.totalStars,
-          languageSkills: data.languageSkills || [],
-          languagePresence: data.languagePresence || [],
-          techSkills: data.techSkills || [],
-          apiRestCount: data.apiRestCount || 0,
-          crudCount: data.crudCount || 0,
-          fullstackCount: data.fullstackCount || 0,
+          detectedTechs: data.detectedTechs ?? {},
+          apiRestCount: data.apiRestCount ?? 0,
+          fullstackCount: data.fullstackCount ?? 0,
+          crudCount: data.crudCount ?? 0,
+          repoCount: data.repoCount ?? (data.totalRepos ?? 0),
         })
-      } catch (e) {
+
+        setSkillsData(data.skillsData ?? [])
+        setTechSkills(data.techSkills ?? [])
+      } catch (err) {
         if (controller.signal.aborted) return
-        console.error('Erro ao buscar stats:', e)
-        setState(s => ({
-          ...s,
+        console.error('Erro ao carregar estatísticas do GitHub:', err)
+        setStats(prev => ({
+          ...prev,
           isLoading: false,
-          error: e instanceof Error ? e.message : 'Erro ao carregar dados do GitHub.',
+          error:
+            'Erro ao carregar dados do GitHub. Verifique se o usuário existe ou tente novamente mais tarde.',
         }))
       }
     }
 
-    run()
+    fetchStats()
     return () => controller.abort()
   }, [])
 
-  return state
+  return {
+    ...stats,
+    skillsData,   // linguagens (fallback)
+    techSkills,   // tecnologias (% de repositórios)
+  }
 }
