@@ -12,17 +12,21 @@ import {
   Smartphone,
   User,
   MessageCircle,
+  Star,
+  GitFork,
+  Calendar,
+  ExternalLink,
 } from 'lucide-react'
 
 import avatarImg from './assets/img-avatar.jpg'
 import { useGitHubStats } from './hooks/useGitHubStats'
+import { useGitHubProjects } from './hooks/useGitHubProjects'
 import { getTechIcon, getTechColor } from './utils/techIcons'
 import About from './pages/About'
 
 type Page = 'home' | 'about'
-
-// tipagem da callback de navegação para evitar "implicit any"
 type SetPage = React.Dispatch<React.SetStateAction<Page>>
+
 type NavigationItem = {
   name: string
   href?: string
@@ -44,7 +48,7 @@ const contactLinks: ContactLink[] = [
   { id: 'whatsapp', label: 'WhatsApp', href: 'https://wa.me/5516997322808', icon: MessageCircle, external: true },
 ]
 
-// fallback para quando não houver dados do GitHub
+// fallback de habilidades (só se a API não devolver nada)
 const fallbackSkills = [
   { name: 'JavaScript', level: 90, icon: Code },
   { name: 'React', level: 85, icon: Globe },
@@ -54,10 +58,29 @@ const fallbackSkills = [
   { name: 'React Native', level: 65, icon: Smartphone },
 ]
 
+// fallback de projetos (só se a API não devolver nada)
+const fallbackProjects = [
+  {
+    id: 1,
+    title: 'Sistema de Gerenciamento',
+    description: 'Sistema completo para gerenciamento de clientes e vendas com dashboard interativo.',
+    technologies: ['React', 'Node.js', 'PostgreSQL', 'TypeScript'],
+    image: 'https://images.pexels.com/photos/574071/pexels-photo-574071.jpeg?auto=compress&cs=tinysrgb&w=600',
+    github: '#',
+    demo: null as string | null,
+    categories: ['frontend', 'backend', 'fullstack'],
+    stars: 0,
+    forks: 0,
+    language: 'TypeScript',
+    lastUpdate: '2024-01-15',
+    size: 1024,
+  },
+]
+
 const App: React.FC = () => {
   const {
-    skillsData,
-    techSkills,
+    skillsData,     // linguagens por bytes
+    techSkills,     // tecnologias detectadas em package.json
     isLoading: isLoadingGitHub,
     error: gitHubError,
     apiRestCount,
@@ -66,10 +89,35 @@ const App: React.FC = () => {
     repoCount,
   } = useGitHubStats()
 
+  const {
+    projects: githubProjects,
+    isLoading: isLoadingProjects,
+    error: projectsError,
+  } = useGitHubProjects()
+
   const [currentPage, setCurrentPage] = React.useState<Page>('home')
   const [showAvatarContacts, setShowAvatarContacts] = React.useState(false)
+  const [activeFilter, setActiveFilter] = React.useState('todos')
 
-  // === HABILIDADES: prioriza techSkills -> skillsData -> fallback ===
+  // menu
+  const navigationItems: NavigationItem[] = [
+    { name: 'Inicio', href: '#inicio' },
+    { name: 'Projetos', href: '#projetos' },
+    { name: 'Habilidades', href: '#habilidades' },
+    { name: 'Sobre', action: (setPage) => setPage('about') },
+    { name: 'Contato', href: '#contato' },
+  ]
+
+  // projetos (com fallback)
+  const displayProjects =
+    projectsError || githubProjects.length === 0 ? fallbackProjects : githubProjects
+
+  const filteredProjects =
+    activeFilter === 'todos'
+      ? displayProjects
+      : displayProjects.filter((p) => (p.categories ?? []).includes(activeFilter))
+
+  // habilidades – prioriza techSkills; cai para skillsData; por último, fallback estático
   const computedBaseSkills =
     techSkills && techSkills.length > 0
       ? techSkills.map((s) => ({ ...s, icon: getTechIcon(s.name) }))
@@ -79,19 +127,11 @@ const App: React.FC = () => {
 
   const topSkills = computedBaseSkills.slice(0, 6)
 
-  // Destaques
+  // counters de habilidades (você pediu “na sequência dos projetos”)
   const capabilityHighlights = [
     { label: 'API REST', value: apiRestCount },
     { label: 'CRUD', value: crudCount },
     { label: 'Full Stack', value: fullstackCount },
-  ]
-
-  // menu – sem item de “Projetos”
-  const navigationItems: NavigationItem[] = [
-    { name: 'Inicio', href: '#inicio' },
-    { name: 'Habilidades', href: '#habilidades' },
-    { name: 'Sobre', action: (setPage) => setPage('about') },
-    { name: 'Contato', href: '#contato' },
   ]
 
   React.useEffect(() => {
@@ -145,30 +185,28 @@ const App: React.FC = () => {
               </div>
             </motion.div>
 
-            <AnimatePresence>
-              {showAvatarContacts && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="grid gap-2"
-                >
-                  {contactLinks.map((contact) => (
-                    <a
-                      key={contact.id}
-                      href={contact.href}
-                      target={contact.external ? '_blank' : undefined}
-                      rel={contact.external ? 'noreferrer' : undefined}
-                      className="flex items-center gap-3 rounded-xl bg-white/5 hover:bg-purple-500/25 text-gray-200 hover:text-white transition-all duration-200 px-3 py-2"
-                    >
-                      <contact.icon className="w-4 h-4 text-purple-300" />
-                      <span className="text-sm">{contact.label}</span>
-                    </a>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {showAvatarContacts && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18 }}
+                className="grid gap-2"
+              >
+                {contactLinks.map((contact) => (
+                  <a
+                    key={contact.id}
+                    href={contact.href}
+                    target={contact.external ? '_blank' : undefined}
+                    rel={contact.external ? 'noreferrer' : undefined}
+                    className="flex items-center gap-3 rounded-xl bg-white/5 hover:bg-purple-500/25 text-gray-200 hover:text-white transition-all duration-200 px-3 py-2"
+                  >
+                    <contact.icon className="w-4 h-4 text-purple-300" />
+                    <span className="text-sm">{contact.label}</span>
+                  </a>
+                ))}
+              </motion.div>
+            )}
           </motion.div>
         </motion.aside>
 
@@ -238,10 +276,10 @@ const App: React.FC = () => {
                 className="flex flex-col sm:flex-row gap-4 justify-center items-center"
               >
                 <button
-                  onClick={() => document.querySelector('#habilidades')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => document.querySelector('#projetos')?.scrollIntoView({ behavior: 'smooth' })}
                   className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-4 rounded-full font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105"
                 >
-                  Ver habilidades
+                  Ver projetos
                 </button>
 
                 <button
@@ -270,8 +308,153 @@ const App: React.FC = () => {
           </div>
         </section>
 
+        {/* Projetos */}
+        <section id="projetos" className="py-20 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+                Projetos <span className="text-purple-400">Reais</span>
+              </h2>
+              <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
+                {projectsError
+                  ? 'Não foi possível carregar os projetos do GitHub. Confira os destaques abaixo.'
+                  : `${filteredProjects.length} projetos carregados diretamente do GitHub.`}
+              </p>
+            </motion.div>
+
+            <div className="flex flex-wrap justify-center gap-4 mb-12">
+              {['todos', 'frontend', 'backend', 'fullstack', 'mobile'].map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                    activeFilter === filter
+                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProjects.map((project: any, index) => (
+                <motion.div
+                  key={project.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1, duration: 0.8 }}
+                  viewport={{ once: true }}
+                  className="bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-white/10 hover:border-purple-500/50 transition-all duration-300 group"
+                >
+                  <div className="relative overflow-hidden">
+                    <img
+                      src={project.image}
+                      alt={project.title}
+                      className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute top-4 right-4 flex space-x-2">
+                      {project.stars > 0 && (
+                        <div className="bg-black/50 backdrop-blur-sm rounded-full px-2 py-1 flex items-center space-x-1">
+                          <Star className="w-3 h-3 text-yellow-400" />
+                          <span className="text-white text-xs">{project.stars}</span>
+                        </div>
+                      )}
+                      {project.forks > 0 && (
+                        <div className="bg-black/50 backdrop-blur-sm rounded-full px-2 py-1 flex items-center space-x-1">
+                          <GitFork className="w-3 h-3 text-blue-400" />
+                          <span className="text-white text-xs">{project.forks}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-bold text-white">{project.title}</h3>
+                      <span className="text-xs text-gray-400 flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {project.lastUpdate}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-300 mb-4 line-clamp-2">{project.description}</p>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {project.technologies.map((tech: string) => (
+                        <span
+                          key={tech}
+                          className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-sm"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div className="flex space-x-4">
+                        <a
+                          href={project.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors duration-300"
+                        >
+                          <Github className="w-5 h-5" />
+                          <span>Código</span>
+                        </a>
+                        {project.demo && (
+                          <a
+                            href={project.demo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors duration-300"
+                          >
+                            <ExternalLink className="w-5 h-5" />
+                            <span>Demo</span>
+                          </a>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500">{(project.size / 1024).toFixed(1)}MB</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {filteredProjects.length === 0 && !isLoadingProjects && (
+              <div className="text-center py-12">
+                <Code className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg">Nenhum projeto encontrado para esta categoria.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Contador de habilidades – imediatamente após Projetos */}
+        <section className="pt-2 pb-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {capabilityHighlights.map(({ label, value }) => (
+              <div
+                key={label}
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-center"
+              >
+                <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
+                <p className="text-2xl font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Habilidades */}
-        <section id="habilidades" className="py-20 px-4 sm:px-6 lg:px-8 bg-black/20">
+        <section id="habilidades" className="py-16 px-4 sm:px-6 lg:px-8 bg-black/20">
           <div className="max-w-7xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -306,21 +489,6 @@ const App: React.FC = () => {
               viewport={{ once: true }}
               className="bg-white/5 backdrop-blur-lg rounded-2xl p-8 border border-white/10"
             >
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-6">
-                <div>
-                  <h3 className="text-2xl font-semibold text-white">Stack principal</h3>
-                  <p className="text-sm text-gray-300">Principais tecnologias identificadas nos repositórios</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
-                  {capabilityHighlights.map(({ label, value }) => (
-                    <div key={label} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center">
-                      <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
-                      <p className="text-xl font-semibold text-white">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {topSkills.map((skill: any, index) => (
                   <div key={skill.name} className="bg-white/5 border border-white/10 rounded-xl p-4">
@@ -328,6 +496,8 @@ const App: React.FC = () => {
                       <skill.icon className="w-7 h-7 text-purple-400 mr-3" />
                       <div>
                         <h4 className="text-lg font-semibold text-white">{skill.name}</h4>
+
+                        {/* label dinâmica: se vier de linguagens (skillsData) mostra bytes; se vier de techSkills mostra % e contagem */}
                         <p className="text-xs text-gray-400">
                           {'bytes' in skill
                             ? `${(Number(skill.bytes) / 1024).toFixed(1)}KB mapeados`
